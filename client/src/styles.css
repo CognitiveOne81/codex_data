@@ -56,27 +56,10 @@ header h1 {
   box-shadow: 0 8px 22px rgba(0, 0, 0, 0.22);
 }
 
-.source-nav {
-  display: grid;
-  grid-template-columns: 48px 1fr 48px;
-  align-items: center;
-  gap: 12px;
-}
-
-.source-nav button {
-  width: 40px;
-  height: 40px;
-  border-radius: 999px;
-  border: 1px solid #304052;
-  background: #131d27;
-  color: #dce2eb;
-  font-size: 1.2rem;
-  transition: border-color 0.2s ease, transform 0.2s ease;
-}
-
-.source-nav button:hover:enabled {
-  border-color: #00c805;
-  transform: translateY(-1px);
+.source-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .segmented { display: flex; gap: 8px; flex-wrap: wrap; }
