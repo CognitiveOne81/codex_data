@@ -17,14 +17,24 @@ function rollingAverage(data, key, windowSize) {
   });
 }
 
-const rollingWindowMap = { '1H': 60, '24H': 24 * 60, '7D': 7 * 24 * 60 };
+function inferPointMillis(data) {
+  if (data.length < 2) return 5 * 60 * 1000;
+  const d1 = new Date(data[0].ts).getTime();
+  const d2 = new Date(data[1].ts).getTime();
+  return Math.max(60_000, d2 - d1);
+}
+
+function rollingWindowPoints(window, data) {
+  const winMillis = { '1H': 3600000, '24H': 86400000, '7D': 604800000 }[window] || 3600000;
+  return Math.max(1, Math.round(winMillis / inferPointMillis(data)));
+}
 
 function formatTs(ts) {
   return new Date(ts).toLocaleString();
 }
 
-export function MetricCharts({ data, sourceName, carrierLabel, transitLabel, rollingEnabled, rollingWindow }) {
-  const windowSize = rollingWindowMap[rollingWindow] || 60;
+export function MetricCharts({ data, carrierLabel, transitLabel, rollingEnabled, rollingWindow }) {
+  const windowSize = rollingWindowPoints(rollingWindow, data);
   const enhanced = rollingEnabled
     ? rollingAverage(rollingAverage(data, 'vesselCount', windowSize), 'energyEstimate', windowSize)
     : data;
@@ -35,12 +45,12 @@ export function MetricCharts({ data, sourceName, carrierLabel, transitLabel, rol
     return (
       <div className="tooltip">
         <strong>{formatTs(p.ts)}</strong>
-        <div>Source: {sourceName}</div>
-        <div>Carrier: {carrierLabel}</div>
-        <div>Transit: {transitLabel}</div>
-        <div>Fuel: {(p.fuelTypes || []).join(', ') || 'Unknown / estimated'}</div>
         <div>Count: {p.vesselCount}</div>
+        <div>Carrier Type: {carrierLabel}</div>
+        <div>Transit Type: {transitLabel}</div>
         <div>Energy: {Math.round(p.energyEstimate).toLocaleString()}</div>
+        <div>Oil energy: {Math.round(p.oilEnergy || 0).toLocaleString()}</div>
+        <div>LNG energy: {Math.round(p.lngEnergy || 0).toLocaleString()}</div>
       </div>
     );
   };
@@ -48,32 +58,32 @@ export function MetricCharts({ data, sourceName, carrierLabel, transitLabel, rol
   return (
     <section className="chart-grid">
       <article className="panel">
-        <h2>Carrier Count Chart</h2>
+        <h2>Carrier Count</h2>
         <ResponsiveContainer width="100%" height={280}>
           <LineChart data={enhanced} syncId="sync-main">
             <CartesianGrid strokeDasharray="2 8" stroke="#2f3844" />
-            <XAxis dataKey="ts" tickFormatter={(value) => new Date(value).toLocaleTimeString()} stroke="#7f8a9a" />
+            <XAxis dataKey="ts" tickFormatter={(value) => new Date(value).toLocaleDateString()} stroke="#7f8a9a" />
             <YAxis stroke="#7f8a9a" />
             <Tooltip content={tooltip} />
-            <Line type="monotone" dataKey="vesselCount" stroke="#00c805" dot={false} strokeWidth={2} />
+            <Line type="monotone" dataKey="vesselCount" stroke="#00c805" dot={false} strokeWidth={2} isAnimationActive />
             {rollingEnabled && (
-              <Line type="monotone" dataKey="vesselCountRolling" stroke="#85ff95" dot={false} strokeWidth={1.5} strokeDasharray="5 5" />
+              <Line type="monotone" dataKey="vesselCountRolling" stroke="#85ff95" dot={false} strokeWidth={1.5} strokeDasharray="5 5" isAnimationActive />
             )}
           </LineChart>
         </ResponsiveContainer>
       </article>
 
       <article className="panel">
-        <h2>Energy Estimate Chart</h2>
+        <h2>Energy Estimate</h2>
         <ResponsiveContainer width="100%" height={280}>
           <LineChart data={enhanced} syncId="sync-main">
             <CartesianGrid strokeDasharray="2 8" stroke="#2f3844" />
-            <XAxis dataKey="ts" tickFormatter={(value) => new Date(value).toLocaleTimeString()} stroke="#7f8a9a" />
+            <XAxis dataKey="ts" tickFormatter={(value) => new Date(value).toLocaleDateString()} stroke="#7f8a9a" />
             <YAxis stroke="#7f8a9a" />
             <Tooltip content={tooltip} />
-            <Line type="monotone" dataKey="energyEstimate" stroke="#5ac8fa" dot={false} strokeWidth={2} />
+            <Line type="monotone" dataKey="energyEstimate" stroke="#5ac8fa" dot={false} strokeWidth={2} isAnimationActive />
             {rollingEnabled && (
-              <Line type="monotone" dataKey="energyEstimateRolling" stroke="#9edfff" dot={false} strokeWidth={1.5} strokeDasharray="5 5" />
+              <Line type="monotone" dataKey="energyEstimateRolling" stroke="#9edfff" dot={false} strokeWidth={1.5} strokeDasharray="5 5" isAnimationActive />
             )}
           </LineChart>
         </ResponsiveContainer>

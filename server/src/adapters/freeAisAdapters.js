@@ -1,56 +1,88 @@
-import { SOURCES } from '../config.js';
+import { config } from '../config.js';
+
+const VESSEL_TYPES = new Set(['VLCC', 'LNG']);
+
+function normalizeType(raw) {
+  const t = String(raw || '').toUpperCase();
+  if (t.includes('LNG')) return 'LNG';
+  if (t.includes('VLCC') || t.includes('CRUDE') || t.includes('TANKER')) return 'VLCC';
+  return null;
+}
+
+function parseAisHubRow(row) {
+  const vesselType = normalizeType(row.TYPE_NAME || row.SHIPTYPE || row.vessel_type);
+  if (!VESSEL_TYPES.has(vesselType)) return null;
+
+  return {
+    sourceId: 'aishub',
+    sourceName: 'AISHub',
+    mmsi: String(row.MMSI || row.mmsi || ''),
+    imo: row.IMO ? String(row.IMO) : null,
+    vesselName: row.NAME || row.SHIPNAME || 'Unknown',
+    vesselType,
+    lat: Number(row.LAT || row.lat),
+    lon: Number(row.LON || row.lon),
+    observedAt: new Date(row.TIMESTAMP || row.time || Date.now()).toISOString(),
+  };
+}
+
+async function fetchAisHubLive() {
+  if (!config.aisHub.username || !config.aisHub.key) return [];
+
+  const url = new URL(config.aisHub.baseUrl);
+  url.searchParams.set('username', config.aisHub.username);
+  url.searchParams.set('format', '1');
+  url.searchParams.set('output', 'json');
+  url.searchParams.set('compress', '0');
+  url.searchParams.set('apikey', config.aisHub.key);
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), config.aisHub.timeoutMs);
+  try {
+    const res = await fetch(url, { signal: controller.signal });
+    if (!res.ok) throw new Error(`AISHub HTTP ${res.status}`);
+    const payload = await res.json();
+    const rows = Array.isArray(payload?.data) ? payload.data : Array.isArray(payload) ? payload : [];
+    return rows.map(parseAisHubRow).filter(Boolean);
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 function seededRandom(seed) {
   const x = Math.sin(seed) * 10000;
   return x - Math.floor(x);
 }
 
-function pickFuel(vesselType, seed) {
-  if (vesselType === 'LNG') return { fuelType: 'LNG dual-fuel', estimated: true };
-  const fuels = ['Heavy Fuel Oil', 'Low Sulfur Fuel Oil', 'Marine Diesel'];
-  const idx = Math.floor(seededRandom(seed) * fuels.length);
-  return { fuelType: fuels[idx], estimated: true };
-}
-
-function buildSyntheticVessels(sourceId) {
-  const now = Date.now();
+function generateSyntheticSample(now = new Date()) {
   const vessels = [];
-  const total = 7 + Math.floor(seededRandom(now / 100000 + sourceId.length) * 6);
-
-  for (let i = 0; i < total; i += 1) {
+  for (let i = 0; i < 24; i += 1) {
     const vesselType = i % 2 === 0 ? 'VLCC' : 'LNG';
-    const seed = now / 1000 + i * 11 + sourceId.length;
-    const phase = seededRandom(seed);
-    const lat = 25 + phase * 2.6;
-    const lon = 55 + seededRandom(seed + 19) * 2.6;
-    const { fuelType, estimated } = pickFuel(vesselType, seed);
-
+    const seed = now.getTime() / 60000 + i;
+    const onEntranceTrack = i % 3 === 0;
+    const lat = onEntranceTrack ? 26.2 + seededRandom(seed) * 0.5 : 26.12 + seededRandom(seed) * 0.7;
+    const lon = onEntranceTrack ? 55.96 + seededRandom(seed + 3) * 0.12 : 57.16 + seededRandom(seed + 8) * 0.12;
     vessels.push({
-      sourceId,
-      sourceName: SOURCES.find((s) => s.id === sourceId)?.name || sourceId,
-      mmsi: `${sourceId.slice(0, 3)}${1000000 + i}`,
-      imo: `${9000000 + i}`,
-      vesselName: `${vesselType}-${sourceId}-${i}`,
+      sourceId: 'aishub',
+      sourceName: 'AISHub',
+      mmsi: `99900${1000 + i}`,
+      imo: `${9300000 + i}`,
+      vesselName: `${vesselType}-${i}`,
       vesselType,
-      fuelType,
-      fuelTypeEstimated: estimated,
       lat,
       lon,
-      observedAt: new Date(now - i * 60_000).toISOString(),
+      observedAt: now.toISOString(),
     });
   }
-
   return vessels;
 }
 
-export async function fetchSourceVessels(sourceId) {
-  return buildSyntheticVessels(sourceId);
-}
-
 export async function fetchAllSources() {
-  const data = await Promise.all(SOURCES.map(async (source) => ({
-    source,
-    vessels: await fetchSourceVessels(source.id),
-  })));
-  return data;
+  try {
+    const live = await fetchAisHubLive();
+    return [{ source: { id: 'aishub', name: 'AISHub' }, vessels: live.length ? live : generateSyntheticSample() }];
+  } catch (error) {
+    console.error('AISHub fetch failed, using synthetic data:', error.message);
+    return [{ source: { id: 'aishub', name: 'AISHub' }, vessels: generateSyntheticSample() }];
+  }
 }
