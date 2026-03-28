@@ -1,11 +1,18 @@
 import { query } from '../db/client.js';
-import { timeframeToInterval } from '../utils/time.js';
+import { bucketSecondsForTimeframe, timeframeStart } from '../utils/time.js';
 
-export async function getSourceMetrics({ sourceId, timeframe = '1D', transit = 'ENTRANCE', carrier = 'BOTH' }) {
-  const since = new Date(Date.now() - timeframeToInterval(timeframe));
-  const values = [sourceId, since, transit];
+export async function getSourceMetrics({
+  sourceId,
+  timeframe = '1D',
+  transit = 'ENTRANCE',
+  carrier = 'BOTH',
+  energy = 'BOTH',
+}) {
+  const start = timeframeStart(timeframe);
+  const bucketSeconds = bucketSecondsForTimeframe(timeframe);
+
+  const values = [sourceId || 'aishub', start, transit, bucketSeconds];
   let carrierFilter = '';
-
   if (carrier !== 'BOTH') {
     values.push(carrier);
     carrierFilter = ` AND vessel_type = $${values.length}`;
@@ -13,59 +20,43 @@ export async function getSourceMetrics({ sourceId, timeframe = '1D', transit = '
 
   const { rows } = await query(
     `SELECT
-      ts_minute,
-      source_name,
-      source_id,
-      transit_category,
-      vessel_type,
-      SUM(vessel_count)::int AS vessel_count,
-      SUM(energy_value)::float8 AS energy_value,
-      STRING_AGG(DISTINCT fuel_type, ', ') AS fuel_types,
-      BOOL_AND(fuel_type_estimated) AS fuel_type_estimated,
-      MIN(energy_unit) AS energy_unit
-    FROM snapshots
+      to_timestamp(floor(extract(epoch FROM event_time) / $4) * $4) AS bucket,
+      SUM(CASE WHEN vessel_type = 'VLCC' THEN 1 ELSE 0 END)::int AS vlcc_count,
+      SUM(CASE WHEN vessel_type = 'LNG' THEN 1 ELSE 0 END)::int AS lng_count,
+      SUM(CASE WHEN vessel_type = 'VLCC' THEN energy_value ELSE 0 END)::float8 AS oil_energy,
+      SUM(CASE WHEN vessel_type = 'LNG' THEN energy_value ELSE 0 END)::float8 AS lng_energy
+    FROM transit_events
     WHERE source_id = $1
-      AND ts_minute >= $2
-      AND transit_category = $3
+      AND event_time >= $2
+      AND event_type = $3
       ${carrierFilter}
-    GROUP BY ts_minute, source_name, source_id, transit_category, vessel_type
-    ORDER BY ts_minute ASC`,
+    GROUP BY 1
+    ORDER BY 1 ASC`,
     values,
   );
 
-  const byTs = new Map();
-  for (const row of rows) {
-    const key = new Date(row.ts_minute).toISOString();
-    if (!byTs.has(key)) {
-      byTs.set(key, {
-        ts: key,
-        sourceName: row.source_name,
-        sourceId: row.source_id,
-        transitCategory: row.transit_category,
-        vesselCount: 0,
-        energyEstimate: 0,
-        fuelTypes: new Set(),
-        fuelTypeEstimated: true,
-        byCarrier: {},
-      });
-    }
+  return rows.map((row) => {
+    const vlccCount = Number(row.vlcc_count || 0);
+    const lngCount = Number(row.lng_count || 0);
+    const oilEnergy = Number(row.oil_energy || 0);
+    const lngEnergy = Number(row.lng_energy || 0);
 
-    const point = byTs.get(key);
-    point.vesselCount += Number(row.vessel_count);
-    point.energyEstimate += Number(row.energy_value);
-    point.byCarrier[row.vessel_type] = {
-      vesselCount: Number(row.vessel_count),
-      energyEstimate: Number(row.energy_value),
-      energyUnit: row.energy_unit,
+    const vesselCount = carrier === 'VLCC' ? vlccCount : carrier === 'LNG' ? lngCount : vlccCount + lngCount;
+
+    let energyEstimate = oilEnergy + lngEnergy;
+    if (energy === 'OIL') energyEstimate = oilEnergy;
+    if (energy === 'LNG') energyEstimate = lngEnergy;
+
+    return {
+      ts: new Date(row.bucket).toISOString(),
+      transitType: transit,
+      carrierType: carrier,
+      vesselCount,
+      energyEstimate,
+      oilEnergy,
+      lngEnergy,
+      vlccCount,
+      lngCount,
     };
-    if (row.fuel_types) {
-      row.fuel_types.split(', ').forEach((f) => point.fuelTypes.add(f));
-    }
-    point.fuelTypeEstimated = point.fuelTypeEstimated && row.fuel_type_estimated;
-  }
-
-  return [...byTs.values()].map((point) => ({
-    ...point,
-    fuelTypes: [...point.fuelTypes],
-  }));
+  });
 }

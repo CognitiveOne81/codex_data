@@ -1,151 +1,141 @@
-import { config, GEOFENCES } from '../config.js';
+import { ZONES, config } from '../config.js';
 import { query } from '../db/client.js';
 import { fetchAllSources } from '../adapters/freeAisAdapters.js';
-import { isInsideGeofence } from '../utils/geo.js';
-import { floorToMinute } from '../utils/time.js';
+import { isInsideRect } from '../utils/geo.js';
 import { getSettings } from './settingsService.js';
-import { evaluateAndSendAlerts } from './alertService.js';
 
-const seenEntrances = new Map();
 let lastUpdated = null;
-
-function classifyTransit(vessel) {
-  const pos = { lat: vessel.lat, lon: vessel.lon };
-  const atEntrance = isInsideGeofence(pos, GEOFENCES.entrance, config.geofenceKm);
-  const atExit = isInsideGeofence(pos, GEOFENCES.exit, config.geofenceKm);
-  const key = vessel.imo || vessel.mmsi;
-
-  if (atEntrance) {
-    seenEntrances.set(key, Date.now());
-    return 'ENTRANCE';
-  }
-
-  if (atExit && seenEntrances.has(key)) {
-    return 'FULL_TRANSIT';
-  }
-
-  if (atExit) {
-    return 'EXIT';
-  }
-
-  return null;
-}
-
-function computeEnergy(vessel, settings) {
-  if (vessel.vesselType === 'VLCC') {
-    return { value: Number(settings.vlcc_barrels), unit: 'barrels crude oil' };
-  }
-  return { value: Number(settings.lng_m3), unit: 'm3 LNG' };
-}
 
 function dedupe(vessels) {
   const map = new Map();
   for (const vessel of vessels) {
-    const key = vessel.imo || vessel.mmsi || `${vessel.sourceId}:${vessel.vesselName}`;
-    map.set(key, vessel);
+    const vesselKey = vessel.imo || vessel.mmsi;
+    if (!vesselKey) continue;
+    map.set(vesselKey, { ...vessel, vesselKey });
   }
   return [...map.values()];
 }
 
+function energyForVessel(vesselType, settings) {
+  if (vesselType === 'VLCC') return { value: Number(settings.vlcc_barrels), unit: 'barrels' };
+  return { value: Number(settings.lng_m3), unit: 'm3' };
+}
+
+async function getState(vessel) {
+  const { rows } = await query('SELECT * FROM vessel_transit_state WHERE vessel_key = $1', [vessel.vesselKey]);
+  return rows[0] || null;
+}
+
+async function upsertState(vessel, state) {
+  await query(
+    `INSERT INTO vessel_transit_state (vessel_key, source_id, vessel_type, state, transit_seq, last_seen_at, last_outside_at, updated_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,now())
+     ON CONFLICT (vessel_key)
+     DO UPDATE SET
+      source_id = EXCLUDED.source_id,
+      vessel_type = EXCLUDED.vessel_type,
+      state = EXCLUDED.state,
+      transit_seq = EXCLUDED.transit_seq,
+      last_seen_at = EXCLUDED.last_seen_at,
+      last_outside_at = EXCLUDED.last_outside_at,
+      updated_at = now()`,
+    [
+      vessel.vesselKey,
+      vessel.sourceId,
+      vessel.vesselType,
+      state.state,
+      state.transit_seq,
+      state.last_seen_at,
+      state.last_outside_at,
+    ],
+  );
+}
+
+async function insertEvent(vessel, state, eventType, observedAt, settings) {
+  const energy = energyForVessel(vessel.vesselType, settings);
+  await query(
+    `INSERT INTO transit_events
+    (source_id, vessel_key, mmsi, imo, vessel_name, vessel_type, transit_seq, event_type, event_time, lat, lon, energy_value, energy_unit)
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+    ON CONFLICT (source_id, vessel_key, transit_seq, event_type) DO NOTHING`,
+    [
+      vessel.sourceId,
+      vessel.vesselKey,
+      vessel.mmsi,
+      vessel.imo,
+      vessel.vesselName,
+      vessel.vesselType,
+      state.transit_seq,
+      eventType,
+      observedAt,
+      vessel.lat,
+      vessel.lon,
+      energy.value,
+      energy.unit,
+    ],
+  );
+}
+
+async function processVessel(vessel, settings) {
+  const observedAt = new Date(vessel.observedAt);
+  const inEntrance = isInsideRect(vessel, ZONES.entrance);
+  const inExit = isInsideRect(vessel, ZONES.exit);
+  const inAnyZone = inEntrance || inExit;
+
+  await query(
+    `INSERT INTO ais_positions (source_id, vessel_key, mmsi, imo, vessel_name, vessel_type, observed_at, lat, lon)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+     ON CONFLICT (source_id, vessel_key, observed_at) DO NOTHING`,
+    [vessel.sourceId, vessel.vesselKey, vessel.mmsi, vessel.imo, vessel.vesselName, vessel.vesselType, observedAt, vessel.lat, vessel.lon],
+  );
+
+  const existing = await getState(vessel);
+  const state = existing
+    ? { ...existing, transit_seq: Number(existing.transit_seq) }
+    : { state: 'OUTSIDE', transit_seq: 0, last_outside_at: null, last_seen_at: observedAt.toISOString() };
+
+  // Transit reset logic: vessel must be outside both zones and remain outside during cooldown.
+  if (!inAnyZone) {
+    const outsideAt = state.last_outside_at ? new Date(state.last_outside_at) : observedAt;
+    const elapsedHours = (observedAt.getTime() - outsideAt.getTime()) / (60 * 60 * 1000);
+    if (state.state !== 'OUTSIDE' && elapsedHours >= Number(settings.transit_cooldown_hours || config.transitCooldownHours)) {
+      state.state = 'OUTSIDE';
+    }
+    state.last_outside_at = outsideAt.toISOString();
+  } else {
+    state.last_outside_at = null;
+  }
+
+  // Entrance event: one event per vessel per transit sequence.
+  if (state.state === 'OUTSIDE' && inEntrance) {
+    state.transit_seq += 1;
+    state.state = 'ENTERED';
+    await insertEvent(vessel, state, 'ENTRANCE', observedAt, settings);
+  }
+
+  // Full transit event: must have entered first then later hit exit zone.
+  if (state.state === 'ENTERED' && inExit) {
+    state.state = 'COMPLETED';
+    await insertEvent(vessel, state, 'FULL_TRANSIT', observedAt, settings);
+  }
+
+  state.last_seen_at = observedAt.toISOString();
+  await upsertState(vessel, state);
+}
+
 export async function runIngestionCycle() {
   const settings = await getSettings();
-  const snapshotMinute = floorToMinute();
   const sourceData = await fetchAllSources();
-  const upsertRows = [];
 
-  for (const { source, vessels } of sourceData) {
-    const normalized = dedupe(vessels);
+  for (const { vessels } of sourceData) {
+    const normalized = dedupe(vessels).filter((v) => v.vesselType === 'VLCC' || v.vesselType === 'LNG');
     for (const vessel of normalized) {
-      const transitCategory = classifyTransit(vessel);
-      if (!transitCategory) continue;
-      const energy = computeEnergy(vessel, settings);
-
-      await query(
-        `INSERT INTO vessel_events
-          (source_id, source_name, mmsi, imo, vessel_name, vessel_type, fuel_type, fuel_type_estimated, lat, lon, observed_at, transit_category, energy_value, energy_unit)
-         VALUES
-          ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
-        [
-          source.id,
-          source.name,
-          vessel.mmsi,
-          vessel.imo,
-          vessel.vesselName,
-          vessel.vesselType,
-          vessel.fuelType || 'Unknown / estimated',
-          Boolean(vessel.fuelTypeEstimated ?? true),
-          vessel.lat,
-          vessel.lon,
-          vessel.observedAt,
-          transitCategory,
-          energy.value,
-          energy.unit,
-        ],
-      );
-
-      upsertRows.push({
-        source_id: source.id,
-        source_name: source.name,
-        ts_minute: snapshotMinute,
-        transit_category: transitCategory,
-        vessel_type: vessel.vesselType,
-        fuel_type: vessel.fuelType || 'Unknown / estimated',
-        fuel_type_estimated: Boolean(vessel.fuelTypeEstimated ?? true),
-        vessel_count: 1,
-        energy_value: energy.value,
-        energy_unit: energy.unit,
-      });
+      // Sequential processing keeps transit state transitions deterministic per vessel.
+      // eslint-disable-next-line no-await-in-loop
+      await processVessel(vessel, settings);
     }
   }
 
-  const grouped = new Map();
-  for (const row of upsertRows) {
-    const key = [
-      row.source_id,
-      row.ts_minute.toISOString(),
-      row.transit_category,
-      row.vessel_type,
-      row.fuel_type,
-      row.fuel_type_estimated,
-      row.energy_unit,
-    ].join('|');
-
-    if (!grouped.has(key)) {
-      grouped.set(key, { ...row });
-    } else {
-      const current = grouped.get(key);
-      current.vessel_count += 1;
-      current.energy_value += row.energy_value;
-    }
-  }
-
-  const snapshotRows = [...grouped.values()];
-  for (const row of snapshotRows) {
-    await query(
-      `INSERT INTO snapshots
-      (source_id, source_name, ts_minute, transit_category, vessel_type, fuel_type, fuel_type_estimated, vessel_count, energy_value, energy_unit)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
-      ON CONFLICT (source_id, ts_minute, transit_category, vessel_type, fuel_type, fuel_type_estimated)
-      DO UPDATE SET
-        vessel_count = EXCLUDED.vessel_count,
-        energy_value = EXCLUDED.energy_value,
-        energy_unit = EXCLUDED.energy_unit`,
-      [
-        row.source_id,
-        row.source_name,
-        row.ts_minute,
-        row.transit_category,
-        row.vessel_type,
-        row.fuel_type,
-        row.fuel_type_estimated,
-        row.vessel_count,
-        row.energy_value,
-        row.energy_unit,
-      ],
-    );
-  }
-
-  await evaluateAndSendAlerts(snapshotRows, settings);
   lastUpdated = new Date().toISOString();
 }
 

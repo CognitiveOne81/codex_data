@@ -1,4 +1,4 @@
-const ranges = ['1H', '1D', '1W', '1M', '3M', '1Y', 'ALL'];
+const ranges = ['1D', '1W', '1M', '1Y', 'ALL'];
 
 export function TimeframeSelector({ value, onChange }) {
   return (
