@@ -1,6 +1,6 @@
 # Strait of Hormuz Carrier Tracker
 
-A full-stack, dark-mode analytics dashboard for tracking VLCC and LNG carrier movement through the Strait of Hormuz using free AIS source attribution (MarineTraffic, VesselFinder, FleetMon) with one-source-at-a-time chart paging.
+A full-stack, dark-mode analytics dashboard for tracking VLCC and LNG carrier movement through the Strait of Hormuz using a single AIS data source (AISHub) for a focused one-page view.
 
 ## Tech Stack
 
@@ -15,7 +15,7 @@ A full-stack, dark-mode analytics dashboard for tracking VLCC and LNG carrier mo
 - Two primary synchronized line charts only (per active source):
   1. Carrier Count Chart
   2. Energy Estimate Chart
-- One source website visible at a time with left/right arrow paging
+- Single source view fixed to AISHub (no source paging)
 - Filters/toggles:
   - Transit mode: Entrance / Exit / Full Transit
   - Carrier mode: VLCC / LNG / Both
@@ -33,14 +33,14 @@ A full-stack, dark-mode analytics dashboard for tracking VLCC and LNG carrier mo
 
 ## Important Data Source Note
 
-This implementation keeps a modular **adapter layer** (`server/src/adapters/freeAisAdapters.js`) that currently provides synthetic AIS-shaped data for development safety/reliability. It is intentionally designed so you can plug in free public endpoints/pages from MarineTraffic, VesselFinder, FleetMon, or other free AIS aggregators without changing the dashboard contract.
+This implementation keeps a modular **adapter layer** (`server/src/adapters/freeAisAdapters.js`) that currently provides synthetic AIS-shaped data for development safety/reliability and is configured for AISHub as the only source.
 
 Because free AIS pages can rate-limit and change HTML frequently, production adapters should be implemented per source terms of use.
 
 ## System Design
 
 ### Backend flow (every minute)
-1. Pull per-source vessel lists via adapter layer.
+1. Pull AISHub vessel lists via adapter layer.
 2. Normalize vessels into common schema (`mmsi/imo`, vessel type, fuel type, location, timestamp).
 3. Deduplicate by IMO/MMSI.
 4. Classify into transit categories with configurable geofence radius.
@@ -103,7 +103,7 @@ npm run dev
 - `GET /api/status`
 - `GET /api/settings`
 - `PUT /api/settings`
-- `GET /api/metrics?source=marinetraffic&timeframe=1D&transit=ENTRANCE&carrier=BOTH`
+- `GET /api/metrics?source=aishub&timeframe=1D&transit=ENTRANCE&carrier=BOTH`
 
 ## Railway Deployment
 
@@ -127,13 +127,12 @@ Use a reverse proxy/static serving approach in Express and host built frontend f
   - LNG estimate = `vessel_count * lng_m3`
 - Fuel type may be estimated from vessel class when source data is incomplete.
 - Source-level duplicate handling is by IMO/MMSI dedupe.
-- Cross-source comparisons should be interpreted with caution because free AIS sources may have different coverage latency.
-- The UI shows source-specific limitations by explicitly showing one source at a time.
+- This dashboard intentionally avoids cross-source comparisons by using AISHub as the sole provider.
 
 ## Extending the Adapter Layer
 
 Update `server/src/adapters/freeAisAdapters.js` to:
-- Pull from free AIS endpoint/page snapshots per source.
+- Pull from AISHub endpoint/page snapshots.
 - Map external payload fields to normalized schema:
   - `sourceId`, `sourceName`, `mmsi`, `imo`, `vesselName`, `vesselType`, `fuelType`, `fuelTypeEstimated`, `lat`, `lon`, `observedAt`.
 - Keep source attribution in each record.

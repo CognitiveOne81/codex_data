@@ -20,7 +20,7 @@ app.get('/', (_req, res) => {
       '/api/sources',
       '/api/status',
       '/api/settings',
-      '/api/metrics?source=marinetraffic&timeframe=1D&transit=ENTRANCE&carrier=BOTH',
+      '/api/metrics?source=aishub&timeframe=1D&transit=ENTRANCE&carrier=BOTH',
     ],
   });
 });

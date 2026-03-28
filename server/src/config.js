@@ -22,8 +22,6 @@ export const config = {
 };
 
 export const SOURCES = [
-  { id: 'marinetraffic', name: 'MarineTraffic', website: 'https://www.marinetraffic.com/' },
-  { id: 'vesselfinder', name: 'VesselFinder', website: 'https://www.vesselfinder.com/' },
   { id: 'aishub', name: 'AISHub', website: 'https://www.aishub.net/' },
 ];
 
