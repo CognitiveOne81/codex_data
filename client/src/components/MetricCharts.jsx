@@ -29,22 +29,47 @@ function rollingWindowPoints(window, data) {
   return Math.max(1, Math.round(winMillis / inferPointMillis(data)));
 }
 
-function formatTs(ts) {
+function formatTooltipTs(ts) {
   return new Date(ts).toLocaleString();
 }
 
-export function MetricCharts({ data, carrierLabel, transitLabel, rollingEnabled, rollingWindow }) {
+function tickFormatterForTimeframe(timeframe) {
+  return (value) => {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+
+    if (timeframe === '1D') return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    if (timeframe === '1W' || timeframe === '1M') return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+    return date.toLocaleDateString([], { year: 'numeric', month: 'short' });
+  };
+}
+
+function tickCountForTimeframe(timeframe) {
+  const map = {
+    '1D': 8,
+    '1W': 7,
+    '1M': 8,
+    '1Y': 12,
+    ALL: 10,
+  };
+  return map[timeframe] || 8;
+}
+
+export function MetricCharts({ data, timeframe, carrierLabel, transitLabel, rollingEnabled, rollingWindow }) {
   const windowSize = rollingWindowPoints(rollingWindow, data);
   const enhanced = rollingEnabled
     ? rollingAverage(rollingAverage(data, 'vesselCount', windowSize), 'energyEstimate', windowSize)
     : data;
+
+  const xTickFormatter = tickFormatterForTimeframe(timeframe);
+  const xTickCount = tickCountForTimeframe(timeframe);
 
   const tooltip = ({ active, payload }) => {
     if (!active || !payload?.[0]) return null;
     const p = payload[0].payload;
     return (
       <div className="tooltip">
-        <strong>{formatTs(p.ts)}</strong>
+        <strong>{formatTooltipTs(p.ts)}</strong>
         <div>Count: {p.vesselCount}</div>
         <div>Carrier Type: {carrierLabel}</div>
         <div>Transit Type: {transitLabel}</div>
@@ -62,7 +87,7 @@ export function MetricCharts({ data, carrierLabel, transitLabel, rollingEnabled,
         <ResponsiveContainer width="100%" height={280}>
           <LineChart data={enhanced} syncId="sync-main">
             <CartesianGrid strokeDasharray="2 8" stroke="#2f3844" />
-            <XAxis dataKey="ts" tickFormatter={(value) => new Date(value).toLocaleDateString()} stroke="#7f8a9a" />
+            <XAxis dataKey="ts" tickFormatter={xTickFormatter} tickCount={xTickCount} minTickGap={24} stroke="#7f8a9a" />
             <YAxis stroke="#7f8a9a" />
             <Tooltip content={tooltip} />
             <Line type="monotone" dataKey="vesselCount" stroke="#00c805" dot={false} strokeWidth={2} isAnimationActive />
@@ -78,7 +103,7 @@ export function MetricCharts({ data, carrierLabel, transitLabel, rollingEnabled,
         <ResponsiveContainer width="100%" height={280}>
           <LineChart data={enhanced} syncId="sync-main">
             <CartesianGrid strokeDasharray="2 8" stroke="#2f3844" />
-            <XAxis dataKey="ts" tickFormatter={(value) => new Date(value).toLocaleDateString()} stroke="#7f8a9a" />
+            <XAxis dataKey="ts" tickFormatter={xTickFormatter} tickCount={xTickCount} minTickGap={24} stroke="#7f8a9a" />
             <YAxis stroke="#7f8a9a" />
             <Tooltip content={tooltip} />
             <Line type="monotone" dataKey="energyEstimate" stroke="#5ac8fa" dot={false} strokeWidth={2} isAnimationActive />

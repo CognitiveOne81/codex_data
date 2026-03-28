@@ -83,6 +83,7 @@ export function App() {
 
       <MetricCharts
         data={data}
+        timeframe={timeframe}
         carrierLabel={activeCarrier}
         transitLabel={activeTransit}
         rollingEnabled={rollingEnabled}

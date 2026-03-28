@@ -60,5 +60,8 @@ export async function initSchema() {
       transit_cooldown_hours DOUBLE PRECISION NOT NULL,
       updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
+
+    ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS transit_cooldown_hours DOUBLE PRECISION;
+    ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT now();
   `);
 }

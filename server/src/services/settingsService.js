@@ -8,6 +8,14 @@ export async function ensureSettings() {
      ON CONFLICT (id) DO NOTHING`,
     [config.assumptions.vlccBarrels, config.assumptions.lngM3, config.transitCooldownHours],
   );
+
+  await query(
+    `UPDATE app_settings
+     SET transit_cooldown_hours = COALESCE(transit_cooldown_hours, $1),
+         updated_at = COALESCE(updated_at, now())
+     WHERE id = 1`,
+    [config.transitCooldownHours],
+  );
 }
 
 export async function getSettings() {
