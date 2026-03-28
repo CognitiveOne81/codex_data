@@ -22,6 +22,8 @@ const rollingOptions = [
   { label: '7 days', value: '7D' },
 ];
 
+const allowedSourceNames = new Set(['MarineTraffic', 'VesselFinder', 'AISHub']);
+
 export function App() {
   const [sources, setSources] = useState([]);
   const [sourceIndex, setSourceIndex] = useState(0);
@@ -36,11 +38,18 @@ export function App() {
   const activeSource = sources[sourceIndex];
 
   useEffect(() => {
-    fetchSources().then(setSources).catch(console.error);
+    fetchSources()
+      .then((incoming) => {
+        const filtered = incoming.filter((source) => allowedSourceNames.has(source.name));
+        setSources(filtered);
+        setSourceIndex(0);
+      })
+      .catch(console.error);
   }, []);
 
   useEffect(() => {
     if (!activeSource) return;
+
     const load = async () => {
       const [metrics, status] = await Promise.all([
         fetchMetrics({ source: activeSource.id, timeframe, transit, carrier }),
@@ -55,14 +64,17 @@ export function App() {
     return () => clearInterval(timer);
   }, [activeSource, timeframe, transit, carrier]);
 
-  const transitLabel = useMemo(() => transitOptions.find((o) => o.value === transit)?.label || transit, [transit]);
-  const carrierLabel = useMemo(() => carrierOptions.find((o) => o.value === carrier)?.label || carrier, [carrier]);
+  const transitLabel = useMemo(() => transitOptions.find((option) => option.value === transit)?.label || transit, [transit]);
+  const carrierLabel = useMemo(() => carrierOptions.find((option) => option.value === carrier)?.label || carrier, [carrier]);
 
   return (
-    <main className="app">
-      <header>
-        <h1>Strait of Hormuz Carrier Tracker</h1>
-        <p className="subtitle">Dark-mode AIS analytics for VLCC and LNG movement with source-by-source paging.</p>
+    <main className="app robinhood-theme">
+      <header className="hero panel">
+        <div>
+          <p className="eyebrow">AIS Carrier Analytics</p>
+          <h1>Strait of Hormuz Carrier Tracker</h1>
+          <p className="subtitle">Robinhood-inspired source paging with two synchronized line charts per AIS provider.</p>
+        </div>
       </header>
 
       <section className="source-nav panel">
@@ -70,14 +82,21 @@ export function App() {
           type="button"
           onClick={() => setSourceIndex((prev) => (prev - 1 + sources.length) % sources.length)}
           disabled={!sources.length}
+          aria-label="Previous source"
         >
           ←
         </button>
         <div>
           <h2>{activeSource?.name || 'Loading source...'}</h2>
           <div className="meta">Source site: {activeSource?.website || '-'}</div>
+          <div className="meta muted">Page {sources.length ? sourceIndex + 1 : 0} of {sources.length || 0}</div>
         </div>
-        <button type="button" onClick={() => setSourceIndex((prev) => (prev + 1) % sources.length)} disabled={!sources.length}>
+        <button
+          type="button"
+          onClick={() => setSourceIndex((prev) => (prev + 1) % sources.length)}
+          disabled={!sources.length}
+          aria-label="Next source"
+        >
           →
         </button>
       </section>
@@ -90,7 +109,7 @@ export function App() {
           <ToggleGroup label="Rolling Window" value={rollingWindow} onChange={setRollingWindow} options={rollingOptions} />
           <label className="control check">
             <span>Rolling average overlay</span>
-            <input type="checkbox" checked={rollingEnabled} onChange={(e) => setRollingEnabled(e.target.checked)} />
+            <input type="checkbox" checked={rollingEnabled} onChange={(event) => setRollingEnabled(event.target.checked)} />
           </label>
         </div>
         <div className="meta">

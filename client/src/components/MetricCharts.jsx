@@ -46,13 +46,13 @@ export function MetricCharts({ data, sourceName, carrierLabel, transitLabel, rol
   };
 
   return (
-    <>
-      <section className="panel">
+    <section className="chart-grid">
+      <article className="panel">
         <h2>Carrier Count Chart</h2>
-        <ResponsiveContainer width="100%" height={260}>
+        <ResponsiveContainer width="100%" height={280}>
           <LineChart data={enhanced} syncId="sync-main">
             <CartesianGrid strokeDasharray="2 8" stroke="#2f3844" />
-            <XAxis dataKey="ts" tickFormatter={(v) => new Date(v).toLocaleTimeString()} stroke="#7f8a9a" />
+            <XAxis dataKey="ts" tickFormatter={(value) => new Date(value).toLocaleTimeString()} stroke="#7f8a9a" />
             <YAxis stroke="#7f8a9a" />
             <Tooltip content={tooltip} />
             <Line type="monotone" dataKey="vesselCount" stroke="#00c805" dot={false} strokeWidth={2} />
@@ -61,14 +61,14 @@ export function MetricCharts({ data, sourceName, carrierLabel, transitLabel, rol
             )}
           </LineChart>
         </ResponsiveContainer>
-      </section>
+      </article>
 
-      <section className="panel">
+      <article className="panel">
         <h2>Energy Estimate Chart</h2>
-        <ResponsiveContainer width="100%" height={260}>
+        <ResponsiveContainer width="100%" height={280}>
           <LineChart data={enhanced} syncId="sync-main">
             <CartesianGrid strokeDasharray="2 8" stroke="#2f3844" />
-            <XAxis dataKey="ts" tickFormatter={(v) => new Date(v).toLocaleTimeString()} stroke="#7f8a9a" />
+            <XAxis dataKey="ts" tickFormatter={(value) => new Date(value).toLocaleTimeString()} stroke="#7f8a9a" />
             <YAxis stroke="#7f8a9a" />
             <Tooltip content={tooltip} />
             <Line type="monotone" dataKey="energyEstimate" stroke="#5ac8fa" dot={false} strokeWidth={2} />
@@ -77,7 +77,7 @@ export function MetricCharts({ data, sourceName, carrierLabel, transitLabel, rol
             )}
           </LineChart>
         </ResponsiveContainer>
-      </section>
-    </>
+      </article>
+    </section>
   );
 }
