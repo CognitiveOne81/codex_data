@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { fetchMetrics, fetchSources, fetchStatus } from './lib/api';
+import { fetchMetrics, fetchStatus } from './lib/api';
 import { TimeframeSelector } from './components/TimeframeSelector';
 import { ToggleGroup } from './components/ToggleGroup';
 import { MetricCharts } from './components/MetricCharts';
@@ -22,11 +22,13 @@ const rollingOptions = [
   { label: '7 days', value: '7D' },
 ];
 
-const allowedSourceNames = new Set(['MarineTraffic', 'VesselFinder', 'AISHub']);
+const AISHUB_SOURCE = {
+  id: 'aishub',
+  name: 'AISHub',
+  website: 'https://www.aishub.net/',
+};
 
 export function App() {
-  const [sources, setSources] = useState([]);
-  const [sourceIndex, setSourceIndex] = useState(0);
   const [timeframe, setTimeframe] = useState('1D');
   const [transit, setTransit] = useState('ENTRANCE');
   const [carrier, setCarrier] = useState('BOTH');
@@ -35,24 +37,10 @@ export function App() {
   const [data, setData] = useState([]);
   const [lastUpdated, setLastUpdated] = useState('');
 
-  const activeSource = sources[sourceIndex];
-
   useEffect(() => {
-    fetchSources()
-      .then((incoming) => {
-        const filtered = incoming.filter((source) => allowedSourceNames.has(source.name));
-        setSources(filtered);
-        setSourceIndex(0);
-      })
-      .catch(console.error);
-  }, []);
-
-  useEffect(() => {
-    if (!activeSource) return;
-
     const load = async () => {
       const [metrics, status] = await Promise.all([
-        fetchMetrics({ source: activeSource.id, timeframe, transit, carrier }),
+        fetchMetrics({ source: AISHUB_SOURCE.id, timeframe, transit, carrier }),
         fetchStatus(),
       ]);
       setData(metrics);
@@ -62,7 +50,7 @@ export function App() {
     load().catch(console.error);
     const timer = setInterval(load, 60_000);
     return () => clearInterval(timer);
-  }, [activeSource, timeframe, transit, carrier]);
+  }, [timeframe, transit, carrier]);
 
   const transitLabel = useMemo(() => transitOptions.find((option) => option.value === transit)?.label || transit, [transit]);
   const carrierLabel = useMemo(() => carrierOptions.find((option) => option.value === carrier)?.label || carrier, [carrier]);
@@ -73,32 +61,14 @@ export function App() {
         <div>
           <p className="eyebrow">AIS Carrier Analytics</p>
           <h1>Strait of Hormuz Carrier Tracker</h1>
-          <p className="subtitle">Robinhood-inspired source paging with two synchronized line charts per AIS provider.</p>
+          <p className="subtitle">Single-page dashboard focused only on AISHub vessel traffic through the Strait of Hormuz.</p>
         </div>
       </header>
 
-      <section className="source-nav panel">
-        <button
-          type="button"
-          onClick={() => setSourceIndex((prev) => (prev - 1 + sources.length) % sources.length)}
-          disabled={!sources.length}
-          aria-label="Previous source"
-        >
-          ←
-        </button>
-        <div>
-          <h2>{activeSource?.name || 'Loading source...'}</h2>
-          <div className="meta">Source site: {activeSource?.website || '-'}</div>
-          <div className="meta muted">Page {sources.length ? sourceIndex + 1 : 0} of {sources.length || 0}</div>
-        </div>
-        <button
-          type="button"
-          onClick={() => setSourceIndex((prev) => (prev + 1) % sources.length)}
-          disabled={!sources.length}
-          aria-label="Next source"
-        >
-          →
-        </button>
+      <section className="panel source-card">
+        <h2>{AISHUB_SOURCE.name}</h2>
+        <div className="meta">Source site: {AISHUB_SOURCE.website}</div>
+        <div className="meta muted">Data source mode: Single source (AISHub only)</div>
       </section>
 
       <section className="panel controls">
@@ -120,7 +90,7 @@ export function App() {
 
       <MetricCharts
         data={data}
-        sourceName={activeSource?.name || ''}
+        sourceName={AISHUB_SOURCE.name}
         carrierLabel={carrierLabel}
         transitLabel={transitLabel}
         rollingEnabled={rollingEnabled}
