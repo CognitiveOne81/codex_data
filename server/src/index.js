@@ -11,6 +11,19 @@ app.use(cors());
 app.use(express.json());
 
 app.get('/health', (_req, res) => res.json({ ok: true }));
+app.get('/', (_req, res) => {
+  res.json({
+    name: 'Strait of Hormuz Carrier Tracker API',
+    ok: true,
+    health: '/health',
+    endpoints: [
+      '/api/sources',
+      '/api/status',
+      '/api/settings',
+      '/api/metrics?source=marinetraffic&timeframe=1D&transit=ENTRANCE&carrier=BOTH',
+    ],
+  });
+});
 
 app.get('/api/sources', (_req, res) => {
   res.json({ sources: SOURCES });
