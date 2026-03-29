@@ -24,6 +24,13 @@ export const config = {
     username: process.env.AISHUB_USERNAME,
     key: process.env.AISHUB_API_KEY,
     timeoutMs: Number(process.env.AISHUB_TIMEOUT_MS || 20_000),
+    maxAgeMinutes: Number(process.env.AISHUB_INTERVAL_MINUTES || 180),
+    bounds: {
+      latMin: Number(process.env.AISHUB_LAT_MIN || 25.8),
+      latMax: Number(process.env.AISHUB_LAT_MAX || 27.1),
+      lonMin: Number(process.env.AISHUB_LON_MIN || 55.6),
+      lonMax: Number(process.env.AISHUB_LON_MAX || 57.5),
+    },
   },
   smtp: {
     host: process.env.SMTP_HOST,
