@@ -90,6 +90,11 @@ AISHUB_BASE_URL=https://data.aishub.net/ws.php
 AISHUB_USERNAME=...
 AISHUB_API_KEY=...
 AISHUB_TIMEOUT_MS=20000
+AISHUB_INTERVAL_MINUTES=180
+AISHUB_LAT_MIN=25.8
+AISHUB_LAT_MAX=27.1
+AISHUB_LON_MIN=55.6
+AISHUB_LON_MAX=57.5
 ```
 
 Frontend (`client/.env`):
@@ -128,4 +133,3 @@ npm run dev
 ### 4) Verify
 - `/health` returns `{"ok":true}`
 - `/api/metrics?timeframe=ALL&transit=FULL_TRANSIT&carrier=BOTH&energy=BOTH`
-
