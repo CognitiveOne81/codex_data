@@ -9,6 +9,12 @@ export const config = {
   databaseUrl: process.env.DATABASE_URL,
   pollIntervalMs: Number(process.env.POLL_INTERVAL_MS || 60_000),
   transitCooldownHours: Number(process.env.TRANSIT_COOLDOWN_HOURS || 18),
+  alerts: {
+    vlccAbsolute: Number(process.env.ALERT_VLCC_ABSOLUTE || 3),
+    lngAbsolute: Number(process.env.ALERT_LNG_ABSOLUTE || 3),
+    percentBaseline: Number(process.env.ALERT_PERCENT_BASELINE || 50),
+    cooldownMinutes: Number(process.env.ALERT_COOLDOWN_MINUTES || 60),
+  },
   assumptions: {
     vlccBarrels: Number(process.env.VLCC_DEFAULT_BARRELS || 2_000_000),
     lngM3: Number(process.env.LNG_DEFAULT_M3 || 170_000),
@@ -18,6 +24,14 @@ export const config = {
     username: process.env.AISHUB_USERNAME,
     key: process.env.AISHUB_API_KEY,
     timeoutMs: Number(process.env.AISHUB_TIMEOUT_MS || 20_000),
+  },
+  smtp: {
+    host: process.env.SMTP_HOST,
+    port: Number(process.env.SMTP_PORT || 587),
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS,
+    from: process.env.SMTP_FROM || 'noreply@hormuz-tracker.local',
+    to: process.env.SMTP_TO,
   },
 };
 

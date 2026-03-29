@@ -57,11 +57,36 @@ export async function initSchema() {
       id SMALLINT PRIMARY KEY DEFAULT 1,
       vlcc_barrels DOUBLE PRECISION NOT NULL,
       lng_m3 DOUBLE PRECISION NOT NULL,
+      alert_vlcc_absolute DOUBLE PRECISION NOT NULL DEFAULT 3,
+      alert_lng_absolute DOUBLE PRECISION NOT NULL DEFAULT 3,
+      alert_percent_baseline DOUBLE PRECISION NOT NULL DEFAULT 50,
+      alert_cooldown_minutes DOUBLE PRECISION NOT NULL DEFAULT 60,
       transit_cooldown_hours DOUBLE PRECISION NOT NULL,
       updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
 
+    ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS alert_vlcc_absolute DOUBLE PRECISION;
+    ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS alert_lng_absolute DOUBLE PRECISION;
+    ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS alert_percent_baseline DOUBLE PRECISION;
+    ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS alert_cooldown_minutes DOUBLE PRECISION;
     ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS transit_cooldown_hours DOUBLE PRECISION;
     ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT now();
+
+    UPDATE app_settings
+    SET alert_vlcc_absolute = COALESCE(alert_vlcc_absolute, 3),
+        alert_lng_absolute = COALESCE(alert_lng_absolute, 3),
+        alert_percent_baseline = COALESCE(alert_percent_baseline, 50),
+        alert_cooldown_minutes = COALESCE(alert_cooldown_minutes, 60),
+        transit_cooldown_hours = COALESCE(transit_cooldown_hours, 18),
+        updated_at = COALESCE(updated_at, now());
+
+    ALTER TABLE app_settings ALTER COLUMN alert_vlcc_absolute SET DEFAULT 3;
+    ALTER TABLE app_settings ALTER COLUMN alert_lng_absolute SET DEFAULT 3;
+    ALTER TABLE app_settings ALTER COLUMN alert_percent_baseline SET DEFAULT 50;
+    ALTER TABLE app_settings ALTER COLUMN alert_cooldown_minutes SET DEFAULT 60;
+    ALTER TABLE app_settings ALTER COLUMN alert_vlcc_absolute SET NOT NULL;
+    ALTER TABLE app_settings ALTER COLUMN alert_lng_absolute SET NOT NULL;
+    ALTER TABLE app_settings ALTER COLUMN alert_percent_baseline SET NOT NULL;
+    ALTER TABLE app_settings ALTER COLUMN alert_cooldown_minutes SET NOT NULL;
   `);
 }
