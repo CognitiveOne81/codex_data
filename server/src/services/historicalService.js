@@ -7,8 +7,8 @@ function seededRandom(seed) {
 }
 
 /**
- * Backfills deterministic historical events from Jan 1, 2020 onward when the DB is empty.
- * This provides immediate multi-year chartability and is replaced naturally by live AIS events.
+ * Backfills deterministic historical events from HISTORICAL_START onward when the DB is empty.
+ * By default this is a rolling six-year window, configurable via HISTORICAL_START.
  */
 export async function ensureHistoricalSeed() {
   const { rows } = await query('SELECT COUNT(*)::int AS c FROM transit_events');
