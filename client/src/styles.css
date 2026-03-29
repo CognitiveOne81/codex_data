@@ -79,6 +79,28 @@ header h1 {
   font-weight: 700;
 }
 
+.source-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.source-tab {
+  border: 1px solid #2a3442;
+  background: #111923;
+  color: #bec9d9;
+  border-radius: 10px;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+.source-tab.active {
+  border-color: #00c805;
+  color: #ccffd4;
+  background: rgba(0, 200, 5, 0.16);
+}
+
 .control-row { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 12px; }
 
 .control {
