@@ -2,7 +2,14 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-export const HISTORICAL_START = new Date('2020-01-01T00:00:00.000Z');
+function computeHistoricalStart(now = new Date()) {
+  const start = new Date(Date.UTC(now.getUTCFullYear() - 6, now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0));
+  return start;
+}
+
+export const HISTORICAL_START = process.env.HISTORICAL_START
+  ? new Date(process.env.HISTORICAL_START)
+  : computeHistoricalStart();
 
 export const config = {
   port: Number(process.env.PORT || 8080),

@@ -69,8 +69,9 @@ Tooltips include timestamp, count, carrier, transit type, and estimated energy.
 
 ## Historical Coverage
 
-- Historical start is fixed at **January 1, 2020**.
-- If DB is empty, backend seeds deterministic historical event data from 2020-01-01 forward so `ALL` loads immediately.
+- Historical start defaults to a rolling **6-year window** from "today" (UTC midnight).
+- Optionally override with `HISTORICAL_START` in backend environment variables.
+- If DB is empty, backend seeds deterministic historical event data from `HISTORICAL_START` forward so `ALL` loads immediately.
 - Live ingestion then continues every minute.
 
 ## Environment Variables
@@ -81,6 +82,7 @@ Backend (`server/.env`):
 PORT=8080
 DATABASE_URL=postgresql://...
 POLL_INTERVAL_MS=60000
+HISTORICAL_START=2020-03-29T00:00:00.000Z
 TRANSIT_COOLDOWN_HOURS=18
 VLCC_DEFAULT_BARRELS=2000000
 LNG_DEFAULT_M3=170000

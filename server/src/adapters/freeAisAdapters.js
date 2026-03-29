@@ -16,6 +16,26 @@ function normalizeType(raw) {
   return null;
 }
 
+function normalizeObservedAt(raw) {
+  if (!raw && raw !== 0) return new Date().toISOString();
+
+  const numeric = Number(raw);
+  if (Number.isFinite(numeric) && numeric > 0) {
+    const asMilliseconds = numeric < 1e12 ? numeric * 1000 : numeric;
+    const fromNumeric = new Date(asMilliseconds);
+    if (!Number.isNaN(fromNumeric.getTime())) {
+      return fromNumeric.toISOString();
+    }
+  }
+
+  const fromString = new Date(raw);
+  if (!Number.isNaN(fromString.getTime())) {
+    return fromString.toISOString();
+  }
+
+  return new Date().toISOString();
+}
+
 function parseAisHubRow(row) {
   const vesselType = normalizeType(
     row.TYPE_NAME || row.SHIPTYPE || row.vessel_type || row.TYPE || row.type || row.NAME || row.SHIPNAME,
@@ -35,7 +55,7 @@ function parseAisHubRow(row) {
     vesselType,
     lat,
     lon,
-    observedAt: new Date(row.TIMESTAMP || row.time || row.TIME || Date.now()).toISOString(),
+    observedAt: normalizeObservedAt(row.TIMESTAMP || row.time || row.TIME),
   };
 }
 
