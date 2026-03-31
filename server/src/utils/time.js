@@ -1,5 +1,3 @@
-import { HISTORICAL_START } from '../config.js';
-
 export function floorToMinute(date = new Date()) {
   const d = new Date(date);
   d.setUTCSeconds(0, 0);
@@ -13,7 +11,7 @@ export function timeframeStart(timeframe, now = new Date()) {
     '1W': ts - 7 * 24 * 60 * 60 * 1000,
     '1M': ts - 30 * 24 * 60 * 60 * 1000,
     '1Y': ts - 365 * 24 * 60 * 60 * 1000,
-    ALL: HISTORICAL_START.getTime(),
+    ALL: 0,
   };
   return new Date(map[timeframe] || map['1D']);
 }

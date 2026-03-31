@@ -2,15 +2,6 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-function computeHistoricalStart(now = new Date()) {
-  const start = new Date(Date.UTC(now.getUTCFullYear() - 6, now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0));
-  return start;
-}
-
-export const HISTORICAL_START = process.env.HISTORICAL_START
-  ? new Date(process.env.HISTORICAL_START)
-  : computeHistoricalStart();
-
 export const config = {
   port: Number(process.env.PORT || 8080),
   databaseUrl: process.env.DATABASE_URL,
@@ -28,7 +19,7 @@ export const config = {
   },
   aisHub: {
     baseUrl: process.env.AISHUB_BASE_URL || 'https://data.aishub.net/ws.php',
-    username: process.env.AISHUB_USERNAME,
+    username: process.env.AISHUB_USERNAME || process.env.AISHUB_API_KEY,
     key: process.env.AISHUB_API_KEY,
     timeoutMs: Number(process.env.AISHUB_TIMEOUT_MS || 20_000),
     maxAgeMinutes: Number(process.env.AISHUB_INTERVAL_MINUTES || 180),

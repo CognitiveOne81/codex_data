@@ -2,12 +2,11 @@ import express from 'express';
 import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { config, SOURCES, ZONES, HISTORICAL_START } from './config.js';
+import { config, SOURCES, ZONES } from './config.js';
 import { initSchema } from './db/schema.js';
 import { ensureSettings, getSettings, updateSettings } from './services/settingsService.js';
 import { getLastUpdated, runIngestionCycle } from './services/ingestService.js';
 import { getSourceMetrics } from './services/metricsService.js';
-import { ensureHistoricalSeed } from './services/historicalService.js';
 
 const app = express();
 const __filename = fileURLToPath(import.meta.url);
@@ -20,7 +19,7 @@ app.use(express.static(clientDistPath));
 app.get('/health', (_req, res) => res.json({ ok: true }));
 
 app.get('/api/sources', (_req, res) => {
-  res.json({ sources: SOURCES, zones: ZONES, historicalStart: HISTORICAL_START.toISOString() });
+  res.json({ sources: SOURCES, zones: ZONES });
 });
 
 app.get('/api/status', (_req, res) => {
@@ -77,7 +76,6 @@ app.use((err, _req, res, _next) => {
 async function bootstrap() {
   await initSchema();
   await ensureSettings();
-  await ensureHistoricalSeed();
 
   try {
     await runIngestionCycle();

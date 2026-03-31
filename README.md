@@ -9,7 +9,7 @@ Full-stack Railway-ready web app that tracks **VLCC** and **LNG** carriers using
 - **Frontend**: React + Vite + Recharts (dark mode, Robinhood-style)
 - **Backend**: Node.js + Express
 - **Database**: PostgreSQL (Railway Postgres)
-- **Source**: AISHub API (`https://www.aishub.net/`), with synthetic fallback when credentials are unavailable.
+- **Source**: AISHub API (`https://www.aishub.net/api`) live feed.
 
 ## Zone Logic (Rectangles)
 
@@ -67,12 +67,10 @@ Toggles:
 
 Tooltips include timestamp, count, carrier, transit type, and estimated energy.
 
-## Historical Coverage
+## Live Coverage
 
-- Historical start defaults to a rolling **6-year window** from "today" (UTC midnight).
-- Optionally override with `HISTORICAL_START` in backend environment variables.
-- If DB is empty, backend seeds deterministic historical event data from `HISTORICAL_START` forward so `ALL` loads immediately.
-- Live ingestion then continues every minute.
+- The backend ingests **live AIS feed only** (no seeded synthetic or historical backfill data).
+- `ALL` timeframe queries all stored events currently in your database.
 
 ## Environment Variables
 
@@ -82,7 +80,6 @@ Backend (`server/.env`):
 PORT=8080
 DATABASE_URL=postgresql://...
 POLL_INTERVAL_MS=60000
-HISTORICAL_START=2020-03-29T00:00:00.000Z
 TRANSIT_COOLDOWN_HOURS=18
 VLCC_DEFAULT_BARRELS=2000000
 LNG_DEFAULT_M3=170000
