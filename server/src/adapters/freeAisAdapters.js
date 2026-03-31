@@ -59,6 +59,30 @@ function parseAisHubRow(row) {
   };
 }
 
+function parseVesselFinderRow(row) {
+  const ais = row?.AIS || row?.ais || row;
+  if (!ais) return null;
+
+  const vesselType = normalizeType(ais.TYPE || ais.type || ais.TYPE_NAME || ais.SHIPTYPE);
+  if (!VESSEL_TYPES.has(vesselType)) return null;
+
+  const lat = Number(ais.LATITUDE || ais.latitude || ais.LAT || ais.lat);
+  const lon = Number(ais.LONGITUDE || ais.longitude || ais.LON || ais.lon);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+
+  return {
+    sourceId: 'vesselfinder',
+    sourceName: 'VesselFinder',
+    mmsi: String(ais.MMSI || ais.mmsi || ''),
+    imo: ais.IMO ? String(ais.IMO) : null,
+    vesselName: ais.NAME || ais.SHIPNAME || 'Unknown',
+    vesselType,
+    lat,
+    lon,
+    observedAt: normalizeObservedAt(ais.TIMESTAMP || ais.time || ais.TIME),
+  };
+}
+
 async function fetchAisHubLive() {
   if (!config.aisHub.username) {
     throw new Error('AISHUB_USERNAME (or AISHUB_API_KEY) is required for live ingestion');
@@ -102,7 +126,68 @@ async function fetchAisHubLive() {
   }
 }
 
+async function fetchVesselFinderLive() {
+  if (!config.vesselFinder.userKey) {
+    throw new Error('VESSELFINDER_USER_KEY (or VESSELFINDER_API_KEY) is required for live ingestion');
+  }
+
+  const url = new URL(config.vesselFinder.baseUrl);
+  url.searchParams.set('userkey', config.vesselFinder.userKey);
+  url.searchParams.set('format', 'json');
+  url.searchParams.set('interval', String(config.vesselFinder.intervalMinutes));
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), config.vesselFinder.timeoutMs);
+  try {
+    const res = await fetch(url, { signal: controller.signal });
+    if (!res.ok) throw new Error(`VesselFinder HTTP ${res.status}`);
+    const payload = await res.json();
+    const rows = Array.isArray(payload)
+      ? payload
+      : Array.isArray(payload?.data)
+        ? payload.data
+        : Array.isArray(payload?.vessels)
+          ? payload.vessels
+          : [];
+    return rows.map(parseVesselFinderRow).filter(Boolean);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export async function fetchAllSources() {
-  const live = await fetchAisHubLive();
-  return [{ source: { id: 'aishub', name: 'AISHub' }, vessels: live }];
+  const providers = [
+    {
+      id: 'aishub',
+      name: 'AISHub',
+      enabled: Boolean(config.aisHub.username),
+      fetcher: fetchAisHubLive,
+    },
+    {
+      id: 'vesselfinder',
+      name: 'VesselFinder',
+      enabled: Boolean(config.vesselFinder.userKey),
+      fetcher: fetchVesselFinderLive,
+    },
+  ];
+
+  const results = await Promise.all(
+    providers
+      .filter((provider) => provider.enabled)
+      .map(async (provider) => {
+        try {
+          const vessels = await provider.fetcher();
+          return { source: { id: provider.id, name: provider.name }, vessels };
+        } catch (error) {
+          console.error(`${provider.name} ingestion failed:`, error.message);
+          return { source: { id: provider.id, name: provider.name }, vessels: [] };
+        }
+      }),
+  );
+
+  if (!results.length) {
+    throw new Error('No AIS providers configured. Set AISHUB_* or VESSELFINDER_* environment variables.');
+  }
+
+  return results;
 }

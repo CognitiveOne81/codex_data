@@ -1,5 +1,6 @@
 import { query } from '../db/client.js';
 import { bucketSecondsForTimeframe, timeframeStart } from '../utils/time.js';
+import { ENABLED_SOURCES } from '../config.js';
 
 export async function getSourceMetrics({
   sourceId,
@@ -11,7 +12,8 @@ export async function getSourceMetrics({
   const start = timeframeStart(timeframe);
   const bucketSeconds = bucketSecondsForTimeframe(timeframe);
 
-  const values = [sourceId || 'aishub', start, transit, bucketSeconds];
+  const defaultSourceId = ENABLED_SOURCES[0]?.id || 'aishub';
+  const values = [sourceId || defaultSourceId, start, transit, bucketSeconds];
   let carrierFilter = '';
   if (carrier !== 'BOTH') {
     values.push(carrier);

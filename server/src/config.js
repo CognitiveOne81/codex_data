@@ -30,6 +30,12 @@ export const config = {
       lonMax: Number(process.env.AISHUB_LON_MAX || 57.5),
     },
   },
+  vesselFinder: {
+    baseUrl: process.env.VESSELFINDER_BASE_URL || 'https://api.vesselfinder.com/livedata',
+    userKey: process.env.VESSELFINDER_USER_KEY || process.env.VESSELFINDER_API_KEY,
+    timeoutMs: Number(process.env.VESSELFINDER_TIMEOUT_MS || 20_000),
+    intervalMinutes: Number(process.env.VESSELFINDER_INTERVAL_MINUTES || 180),
+  },
   smtp: {
     host: process.env.SMTP_HOST,
     port: Number(process.env.SMTP_PORT || 587),
@@ -40,7 +46,16 @@ export const config = {
   },
 };
 
-export const SOURCES = [{ id: 'aishub', name: 'AISHub', website: 'https://www.aishub.net/' }];
+export const SOURCES = [
+  { id: 'aishub', name: 'AISHub', website: 'https://www.aishub.net/' },
+  { id: 'vesselfinder', name: 'VesselFinder', website: 'https://www.vesselfinder.com/' },
+];
+
+export const ENABLED_SOURCES = SOURCES.filter((source) => {
+  if (source.id === 'aishub') return Boolean(config.aisHub.username);
+  if (source.id === 'vesselfinder') return Boolean(config.vesselFinder.userKey);
+  return false;
+});
 
 export const ZONES = {
   entrance: {
