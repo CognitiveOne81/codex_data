@@ -83,6 +83,53 @@ function parseVesselFinderRow(row) {
   };
 }
 
+function parseGenericRow(row, sourceId, sourceName) {
+  const vesselType = normalizeType(
+    row.SHIPTYPE ||
+      row.vessel_type ||
+      row.shiptype ||
+      row.TYPE_NAME ||
+      row.TYPE ||
+      row.type ||
+      row.SHIP_TYPE ||
+      row.CATEGORY ||
+      row.category,
+  );
+  if (!VESSEL_TYPES.has(vesselType)) return null;
+
+  const lat = Number(row.LAT || row.lat || row.LATITUDE || row.latitude);
+  const lon = Number(row.LON || row.lon || row.LONGITUDE || row.longitude);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+
+  return {
+    sourceId,
+    sourceName,
+    mmsi: String(row.MMSI || row.mmsi || ''),
+    imo: row.IMO ? String(row.IMO) : row.imo ? String(row.imo) : null,
+    vesselName: row.NAME || row.SHIPNAME || row.shipname || row.VESSEL_NAME || 'Unknown',
+    vesselType,
+    lat,
+    lon,
+    observedAt: normalizeObservedAt(
+      row.TIMESTAMP || row.time || row.TIME || row.LAST_POS_UTC || row.LAST_RECEIVED_UTC || row.timestamp,
+    ),
+  };
+}
+
+function normalizePayloadRows(payload) {
+  return Array.isArray(payload)
+    ? payload
+    : Array.isArray(payload?.data)
+      ? payload.data
+      : Array.isArray(payload?.vessels)
+        ? payload.vessels
+        : Array.isArray(payload?.Data)
+          ? payload.Data
+          : Array.isArray(payload?.result)
+            ? payload.result
+            : [];
+}
+
 async function fetchAisHubLive() {
   if (!config.aisHub.username) {
     throw new Error('AISHUB_USERNAME (or AISHUB_API_KEY) is required for live ingestion');
@@ -155,6 +202,68 @@ async function fetchVesselFinderLive() {
   }
 }
 
+async function fetchFleetMonLive() {
+  if (!config.fleetMon.apiKey) {
+    throw new Error('FLEETMON_API_KEY is required for FleetMon ingestion');
+  }
+
+  const url = new URL(config.fleetMon.baseUrl);
+  url.searchParams.set('api_key', config.fleetMon.apiKey);
+  url.searchParams.set('format', 'json');
+  url.searchParams.set('timespan', String(config.fleetMon.intervalMinutes));
+  url.searchParams.set('min_lat', String(config.fleetMon.bounds.latMin));
+  url.searchParams.set('max_lat', String(config.fleetMon.bounds.latMax));
+  url.searchParams.set('min_lon', String(config.fleetMon.bounds.lonMin));
+  url.searchParams.set('max_lon', String(config.fleetMon.bounds.lonMax));
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), config.fleetMon.timeoutMs);
+  try {
+    const res = await fetch(url, {
+      headers: { Accept: 'application/json' },
+      signal: controller.signal,
+    });
+    if (!res.ok) throw new Error(`FleetMon HTTP ${res.status}`);
+    const payload = await res.json();
+    return normalizePayloadRows(payload).map((row) => parseGenericRow(row, 'fleetmon', 'FleetMon')).filter(Boolean);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function fetchMarineTrafficLive() {
+  if (!config.marineTraffic.apiKey) {
+    throw new Error('MARINETRAFFIC_API_KEY is required for MarineTraffic ingestion');
+  }
+
+  const baseUrl = config.marineTraffic.baseUrl.endsWith('/')
+    ? config.marineTraffic.baseUrl
+    : `${config.marineTraffic.baseUrl}/`;
+  const url = new URL(`${baseUrl}${encodeURIComponent(config.marineTraffic.apiKey)}`);
+  url.searchParams.set('protocol', config.marineTraffic.protocol);
+  url.searchParams.set('timespan', String(config.marineTraffic.timespanMinutes));
+  url.searchParams.set('minlat', String(config.marineTraffic.bounds.latMin));
+  url.searchParams.set('maxlat', String(config.marineTraffic.bounds.latMax));
+  url.searchParams.set('minlon', String(config.marineTraffic.bounds.lonMin));
+  url.searchParams.set('maxlon', String(config.marineTraffic.bounds.lonMax));
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), config.marineTraffic.timeoutMs);
+  try {
+    const res = await fetch(url, {
+      headers: { Accept: 'application/json' },
+      signal: controller.signal,
+    });
+    if (!res.ok) throw new Error(`MarineTraffic HTTP ${res.status}`);
+    const payload = await res.json();
+    return normalizePayloadRows(payload)
+      .map((row) => parseGenericRow(row, 'marinetraffic', 'MarineTraffic'))
+      .filter(Boolean);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export async function fetchAllSources() {
   const providers = [
     {
@@ -168,6 +277,18 @@ export async function fetchAllSources() {
       name: 'VesselFinder',
       enabled: Boolean(config.vesselFinder.userKey),
       fetcher: fetchVesselFinderLive,
+    },
+    {
+      id: 'fleetmon',
+      name: 'FleetMon',
+      enabled: Boolean(config.fleetMon.apiKey),
+      fetcher: fetchFleetMonLive,
+    },
+    {
+      id: 'marinetraffic',
+      name: 'MarineTraffic',
+      enabled: Boolean(config.marineTraffic.apiKey),
+      fetcher: fetchMarineTrafficLive,
     },
   ];
 
@@ -186,7 +307,9 @@ export async function fetchAllSources() {
   );
 
   if (!results.length) {
-    throw new Error('No AIS providers configured. Set AISHUB_* or VESSELFINDER_* environment variables.');
+    throw new Error(
+      'No AIS providers configured. Set one of AISHUB_*, VESSELFINDER_*, FLEETMON_* or MARINETRAFFIC_* environment variables.',
+    );
   }
 
   return results;

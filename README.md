@@ -9,7 +9,7 @@ Full-stack Railway-ready web app that tracks **VLCC** and **LNG** carriers using
 - **Frontend**: React + Vite + Recharts (dark mode, Robinhood-style)
 - **Backend**: Node.js + Express
 - **Database**: PostgreSQL (Railway Postgres)
-- **Sources**: AISHub and/or VesselFinder live AIS feeds.
+- **Sources**: AISHub, VesselFinder, FleetMon and/or MarineTraffic live AIS feeds.
 
 ## Zone Logic (Rectangles)
 
@@ -100,9 +100,30 @@ VESSELFINDER_BASE_URL=https://api.vesselfinder.com/livedata
 VESSELFINDER_USER_KEY=...
 VESSELFINDER_TIMEOUT_MS=20000
 VESSELFINDER_INTERVAL_MINUTES=180
+
+# FleetMon (optional)
+FLEETMON_BASE_URL=https://api.fleetmon.com/v1/positions
+FLEETMON_API_KEY=...
+FLEETMON_TIMEOUT_MS=20000
+FLEETMON_INTERVAL_MINUTES=180
+FLEETMON_LAT_MIN=25.8
+FLEETMON_LAT_MAX=27.1
+FLEETMON_LON_MIN=55.6
+FLEETMON_LON_MAX=57.5
+
+# MarineTraffic (optional)
+MARINETRAFFIC_BASE_URL=https://services.marinetraffic.com/api/exportvessel/v:8
+MARINETRAFFIC_API_KEY=...
+MARINETRAFFIC_PROTOCOL=jsono
+MARINETRAFFIC_TIMESPAN_MINUTES=180
+MARINETRAFFIC_TIMEOUT_MS=20000
+MARINETRAFFIC_LAT_MIN=25.8
+MARINETRAFFIC_LAT_MAX=27.1
+MARINETRAFFIC_LON_MIN=55.6
+MARINETRAFFIC_LON_MAX=57.5
 ```
 
-At least one provider must be configured (`AISHUB_*` or `VESSELFINDER_*`).
+At least one provider must be configured (`AISHUB_*`, `VESSELFINDER_*`, `FLEETMON_*`, or `MARINETRAFFIC_*`).
 
 Frontend (`client/.env`):
 
