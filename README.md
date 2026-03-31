@@ -9,7 +9,7 @@ Full-stack Railway-ready web app that tracks **VLCC** and **LNG** carriers using
 - **Frontend**: React + Vite + Recharts (dark mode, Robinhood-style)
 - **Backend**: Node.js + Express
 - **Database**: PostgreSQL (Railway Postgres)
-- **Source**: AISHub API (`https://www.aishub.net/api`) live feed.
+- **Sources**: AISHub and/or VesselFinder live AIS feeds.
 
 ## Zone Logic (Rectangles)
 
@@ -84,7 +84,7 @@ TRANSIT_COOLDOWN_HOURS=18
 VLCC_DEFAULT_BARRELS=2000000
 LNG_DEFAULT_M3=170000
 
-# AISHub
+# AISHub (optional)
 AISHUB_BASE_URL=https://data.aishub.net/ws.php
 AISHUB_USERNAME=...
 AISHUB_API_KEY=...
@@ -94,7 +94,15 @@ AISHUB_LAT_MIN=25.8
 AISHUB_LAT_MAX=27.1
 AISHUB_LON_MIN=55.6
 AISHUB_LON_MAX=57.5
+
+# VesselFinder (optional)
+VESSELFINDER_BASE_URL=https://api.vesselfinder.com/livedata
+VESSELFINDER_USER_KEY=...
+VESSELFINDER_TIMEOUT_MS=20000
+VESSELFINDER_INTERVAL_MINUTES=180
 ```
+
+At least one provider must be configured (`AISHUB_*` or `VESSELFINDER_*`).
 
 Frontend (`client/.env`):
 
