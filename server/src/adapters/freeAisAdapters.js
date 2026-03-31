@@ -60,7 +60,9 @@ function parseAisHubRow(row) {
 }
 
 async function fetchAisHubLive() {
-  if (!config.aisHub.username) return [];
+  if (!config.aisHub.username) {
+    throw new Error('AISHUB_USERNAME (or AISHUB_API_KEY) is required for live ingestion');
+  }
 
   const url = new URL(config.aisHub.baseUrl);
   url.searchParams.set('username', config.aisHub.username);
@@ -87,51 +89,20 @@ async function fetchAisHubLive() {
       ? payload.data
       : Array.isArray(payload?.vessels)
         ? payload.vessels
-        : Array.isArray(payload) && Array.isArray(payload[1])
-          ? payload[1]
-          : Array.isArray(payload)
-            ? payload
-            : [];
+        : Array.isArray(payload?.Data)
+          ? payload.Data
+          : Array.isArray(payload) && Array.isArray(payload[1])
+            ? payload[1]
+            : Array.isArray(payload)
+              ? payload
+              : [];
     return rows.map(parseAisHubRow).filter(Boolean);
   } finally {
     clearTimeout(timer);
   }
 }
 
-function seededRandom(seed) {
-  const x = Math.sin(seed) * 10000;
-  return x - Math.floor(x);
-}
-
-function generateSyntheticSample(now = new Date()) {
-  const vessels = [];
-  for (let i = 0; i < 24; i += 1) {
-    const vesselType = i % 2 === 0 ? 'VLCC' : 'LNG';
-    const seed = now.getTime() / 60000 + i;
-    const onEntranceTrack = i % 3 === 0;
-    const lat = onEntranceTrack ? 26.2 + seededRandom(seed) * 0.5 : 26.12 + seededRandom(seed) * 0.7;
-    const lon = onEntranceTrack ? 55.96 + seededRandom(seed + 3) * 0.12 : 57.16 + seededRandom(seed + 8) * 0.12;
-    vessels.push({
-      sourceId: 'aishub',
-      sourceName: 'AISHub',
-      mmsi: `99900${1000 + i}`,
-      imo: `${9300000 + i}`,
-      vesselName: `${vesselType}-${i}`,
-      vesselType,
-      lat,
-      lon,
-      observedAt: now.toISOString(),
-    });
-  }
-  return vessels;
-}
-
 export async function fetchAllSources() {
-  try {
-    const live = await fetchAisHubLive();
-    return [{ source: { id: 'aishub', name: 'AISHub' }, vessels: live.length ? live : generateSyntheticSample() }];
-  } catch (error) {
-    console.error('AISHub fetch failed, using synthetic data:', error.message);
-    return [{ source: { id: 'aishub', name: 'AISHub' }, vessels: generateSyntheticSample() }];
-  }
+  const live = await fetchAisHubLive();
+  return [{ source: { id: 'aishub', name: 'AISHub' }, vessels: live }];
 }
