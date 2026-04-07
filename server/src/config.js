@@ -30,38 +30,6 @@ export const config = {
       lonMax: Number(process.env.AISHUB_LON_MAX || 57.5),
     },
   },
-  vesselFinder: {
-    baseUrl: process.env.VESSELFINDER_BASE_URL || 'https://api.vesselfinder.com/livedata',
-    userKey: process.env.VESSELFINDER_USER_KEY || process.env.VESSELFINDER_API_KEY,
-    timeoutMs: Number(process.env.VESSELFINDER_TIMEOUT_MS || 20_000),
-    intervalMinutes: Number(process.env.VESSELFINDER_INTERVAL_MINUTES || 180),
-  },
-  fleetMon: {
-    baseUrl: process.env.FLEETMON_BASE_URL || 'https://api.fleetmon.com/v1/positions',
-    apiKey: process.env.FLEETMON_API_KEY,
-    timeoutMs: Number(process.env.FLEETMON_TIMEOUT_MS || 20_000),
-    intervalMinutes: Number(process.env.FLEETMON_INTERVAL_MINUTES || 180),
-    bounds: {
-      latMin: Number(process.env.FLEETMON_LAT_MIN || 25.8),
-      latMax: Number(process.env.FLEETMON_LAT_MAX || 27.1),
-      lonMin: Number(process.env.FLEETMON_LON_MIN || 55.6),
-      lonMax: Number(process.env.FLEETMON_LON_MAX || 57.5),
-    },
-  },
-  marineTraffic: {
-    baseUrl: process.env.MARINETRAFFIC_BASE_URL || 'https://services.marinetraffic.com/api/exportvessel/v:8',
-    apiKey: process.env.MARINETRAFFIC_API_KEY,
-    timeoutMs: Number(process.env.MARINETRAFFIC_TIMEOUT_MS || 20_000),
-    intervalMinutes: Number(process.env.MARINETRAFFIC_INTERVAL_MINUTES || 180),
-    protocol: process.env.MARINETRAFFIC_PROTOCOL || 'jsono',
-    timespanMinutes: Number(process.env.MARINETRAFFIC_TIMESPAN_MINUTES || 180),
-    bounds: {
-      latMin: Number(process.env.MARINETRAFFIC_LAT_MIN || 25.8),
-      latMax: Number(process.env.MARINETRAFFIC_LAT_MAX || 27.1),
-      lonMin: Number(process.env.MARINETRAFFIC_LON_MIN || 55.6),
-      lonMax: Number(process.env.MARINETRAFFIC_LON_MAX || 57.5),
-    },
-  },
   smtp: {
     host: process.env.SMTP_HOST,
     port: Number(process.env.SMTP_PORT || 587),
@@ -72,20 +40,7 @@ export const config = {
   },
 };
 
-export const SOURCES = [
-  { id: 'aishub', name: 'AISHub', website: 'https://www.aishub.net/' },
-  { id: 'vesselfinder', name: 'VesselFinder', website: 'https://www.vesselfinder.com/' },
-  { id: 'fleetmon', name: 'FleetMon', website: 'https://www.fleetmon.com/' },
-  { id: 'marinetraffic', name: 'MarineTraffic', website: 'https://www.marinetraffic.com/' },
-];
-
-export const ENABLED_SOURCES = SOURCES.filter((source) => {
-  if (source.id === 'aishub') return Boolean(config.aisHub.username);
-  if (source.id === 'vesselfinder') return Boolean(config.vesselFinder.userKey);
-  if (source.id === 'fleetmon') return Boolean(config.fleetMon.apiKey);
-  if (source.id === 'marinetraffic') return Boolean(config.marineTraffic.apiKey);
-  return false;
-});
+export const SOURCES = [{ id: 'aishub', name: 'AISHub', website: 'https://www.aishub.net/' }];
 
 export const ZONES = {
   entrance: {

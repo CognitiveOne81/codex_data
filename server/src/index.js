@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { config, ENABLED_SOURCES, ZONES } from './config.js';
+import { config, SOURCES, ZONES } from './config.js';
 import { initSchema } from './db/schema.js';
 import { ensureSettings, getSettings, updateSettings } from './services/settingsService.js';
 import { getLastUpdated, runIngestionCycle } from './services/ingestService.js';
@@ -19,7 +19,7 @@ app.use(express.static(clientDistPath));
 app.get('/health', (_req, res) => res.json({ ok: true }));
 
 app.get('/api/sources', (_req, res) => {
-  res.json({ sources: ENABLED_SOURCES, zones: ZONES });
+  res.json({ sources: SOURCES, zones: ZONES });
 });
 
 app.get('/api/status', (_req, res) => {
@@ -49,7 +49,7 @@ app.put('/api/settings', async (req, res, next) => {
 app.get('/api/metrics', async (req, res, next) => {
   try {
     const data = await getSourceMetrics({
-      sourceId: req.query.source || ENABLED_SOURCES[0]?.id || 'aishub',
+      sourceId: req.query.source || 'aishub',
       timeframe: req.query.timeframe || '1D',
       transit: req.query.transit || 'ENTRANCE',
       carrier: req.query.carrier || 'BOTH',
